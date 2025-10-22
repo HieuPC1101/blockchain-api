@@ -35,24 +35,27 @@ export class AlchemyProvider {
      * Get provider for specific network 
      */
     private getProvider(networkId: string): ethers.JsonRpcProvider {
-        if (!this.providers.has(networkId)) {
-            const network = NETWORKS[networkId];
+        // Trim whitespace and convert to lowercase for consistency
+        const cleanNetworkId = networkId.trim().toLowerCase();
+
+        if (!this.providers.has(cleanNetworkId)) {
+            const network = NETWORKS[cleanNetworkId];
             if (!network) {
-                throw new Error(`Unsupported network: ${networkId}`);
+                throw new Error(`Unsupported network: ${cleanNetworkId}`);
             }
 
             // Build RPC URL with API key 
-            const alchemyNetwork = ALCHEMY_NETWORKS[networkId];
+            const alchemyNetwork = ALCHEMY_NETWORKS[cleanNetworkId];
             if (!alchemyNetwork) {
-                throw new Error(`Alchemy not supported for network: ${networkId}`);
+                throw new Error(`Alchemy not supported for network: ${cleanNetworkId}`);
             }
 
             const rpcUrl = `https://${alchemyNetwork}.g.alchemy.com/v2/${this.apiKey}`;
             const provider = new ethers.JsonRpcProvider(rpcUrl);
-            this.providers.set(networkId, provider);
+            this.providers.set(cleanNetworkId, provider);
         }
 
-        return this.providers.get(networkId)!;
+        return this.providers.get(cleanNetworkId)!;
     }
 
     /** 
@@ -72,7 +75,11 @@ export class AlchemyProvider {
                 };
             }
 
-            const assetInfo = parseAssetId(assetId);
+            // Trim inputs to remove any whitespace
+            const cleanAddress = address.trim();
+            const cleanAssetId = assetId.trim();
+
+            const assetInfo = parseAssetId(cleanAssetId);
             const provider = this.getProvider(assetInfo.networkId);
 
             let balance: string;
@@ -80,7 +87,7 @@ export class AlchemyProvider {
 
             if (assetInfo.type === 'native') {
                 // Native token balance 
-                const balanceWei = await provider.getBalance(address);
+                const balanceWei = await provider.getBalance(cleanAddress);
                 balance = balanceWei.toString();
                 balanceFormatted = weiToEther(balance);
             } else if (assetInfo.type === 'erc20' && assetInfo.contractAddress) {
@@ -93,7 +100,7 @@ export class AlchemyProvider {
                 );
 
                 const [balanceWei, decimals] = await Promise.all([
-                    contract.balanceOf(address),
+                    contract.balanceOf(cleanAddress),
                     contract.decimals()
                 ]);
 
@@ -106,7 +113,7 @@ export class AlchemyProvider {
             const response: BalanceResponse = {
                 balance,
                 balanceFormatted,
-                assetId,
+                assetId: cleanAssetId,
                 networkId: assetInfo.networkId,
                 timestamp: Date.now()
             };
@@ -146,7 +153,9 @@ export class AlchemyProvider {
                 };
             }
 
-            const provider = this.getProvider(networkId);
+            // Trim networkId to remove any whitespace
+            const cleanNetworkId = networkId.trim().toLowerCase();
+            const provider = this.getProvider(cleanNetworkId);
 
             if (type === 'legacy') {
                 const gasPrice = await provider.getFeeData();
@@ -156,7 +165,7 @@ export class AlchemyProvider {
                 const response: GasPriceResponse = {
                     gasPrice: gasPrice.gasPrice?.toString() || '0',
                     gasPriceGwei,
-                    networkId,
+                    networkId: cleanNetworkId,
                     type: 'legacy',
                     timestamp: Date.now()
                 };
@@ -176,7 +185,7 @@ export class AlchemyProvider {
                         'gwei'),
                     maxFeePerGas: feeData.maxFeePerGas?.toString(),
                     maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.toString(),
-                    networkId,
+                    networkId: cleanNetworkId,
                     type: 'eip1559',
                     timestamp: Date.now()
                 };
@@ -206,14 +215,17 @@ export class AlchemyProvider {
     async getHistory(address: string, assetId: string, page: number = 1,
         limit: number = 50): Promise<ApiResponse<HistoryResponse>> {
         try {
-            const assetInfo = parseAssetId(assetId);
+            // Trim inputs to remove any whitespace
+            const cleanAddress = address.trim();
+            const cleanAssetId = assetId.trim();
+
+            const assetInfo = parseAssetId(cleanAssetId);
             const provider = this.getProvider(assetInfo.networkId);
 
             // Get transaction history using Alchemy API 
             const alchemyNetwork = ALCHEMY_NETWORKS[assetInfo.networkId];
             if (!alchemyNetwork) {
-                throw new Error(`Alchemy not supported for network: 
-${assetInfo.networkId}`);
+                throw new Error(`Alchemy not supported for network: ${assetInfo.networkId}`);
             }
 
             const alchemyUrl =
@@ -225,7 +237,7 @@ ${assetInfo.networkId}`);
                 params: [{
                     fromBlock: '0x0',
                     toBlock: 'latest',
-                    fromAddress: address,
+                    fromAddress: cleanAddress,
                     category: ['external', 'erc20', 'erc721', 'erc1155'],
                     withMetadata: true,
                     excludeZeroValue: false,
@@ -248,12 +260,12 @@ ${assetInfo.networkId}`);
                 gasUsed: transfer.gas?.toString() || '0',
                 gasPrice: transfer.gasPrice?.toString() || '0',
                 status: transfer.metadata?.isError ? 'failed' : 'success',
-                type: transfer.from.toLowerCase() === address.toLowerCase() ?
+                type: transfer.from.toLowerCase() === cleanAddress.toLowerCase() ?
                     'send' : 'receive'
             }));
 
             const historyResponse: HistoryResponse = {
-                assetId,
+                assetId: cleanAssetId,
                 networkId: assetInfo.networkId,
                 transactions,
                 total: response.data.result?.totalCount || transactions.length,
@@ -285,36 +297,40 @@ ${assetInfo.networkId}`);
     async getNftOwners(contractAddress: string, networkId: string,
         tokenId?: string): Promise<ApiResponse<NftOwnerResponse>> {
         try {
-            const alchemyNetwork = ALCHEMY_NETWORKS[networkId];
+            // Trim inputs to remove any whitespace
+            const cleanContractAddress = contractAddress.trim();
+            const cleanNetworkId = networkId.trim().toLowerCase();
+
+            const alchemyNetwork = ALCHEMY_NETWORKS[cleanNetworkId];
             if (!alchemyNetwork) {
-                throw new Error(`Alchemy not supported for network: 
-${networkId}`);
+                throw new Error(`Alchemy not supported for network: ${cleanNetworkId}`);
             }
 
             // If tokenId provided → use JSON-RPC alchemy_getOwnersForToken 
             if (tokenId) {
+                const cleanTokenId = tokenId.trim();
                 const rpcUrl =
                     `https://${alchemyNetwork}.g.alchemy.com/v2/${this.apiKey}`;
                 const rpcResponse = await axios.post(rpcUrl, {
                     jsonrpc: '2.0',
                     method: 'alchemy_getOwnersForToken',
-                    params: [contractAddress, tokenId],
+                    params: [cleanContractAddress, cleanTokenId],
                     id: 1
                 });
 
                 const owners: string[] = rpcResponse.data?.result?.owners || [];
                 const nftOwners: NftOwner[] = owners.map((ownerAddress: string) => ({
                     owner: ownerAddress,
-                    tokenId: tokenId,
+                    tokenId: cleanTokenId,
                     balance: '1'
                 }));
 
                 const ownerResponse: NftOwnerResponse = {
                     owners: nftOwners,
                     total: nftOwners.length,
-                    contractAddress,
-                    tokenId,
-                    networkId
+                    contractAddress: cleanContractAddress,
+                    tokenId: cleanTokenId,
+                    networkId: cleanNetworkId
                 };
 
                 return {
@@ -326,11 +342,10 @@ ${networkId}`);
 
             // Else → use REST v3 getOwnersForCollection 
             const restUrl =
-                `https://${alchemyNetwork}.g.alchemy.com/nft/v3/${this.apiKey}/getOwnersF
- orCollection`;
+                `https://${alchemyNetwork}.g.alchemy.com/nft/v3/${this.apiKey}/getOwnersForCollection`;
             const restResponse = await axios.get(restUrl, {
                 params: {
-                    contractAddress,
+                    contractAddress: cleanContractAddress,
                     withTokenBalances: true
                 }
             });
@@ -362,8 +377,8 @@ ${networkId}`);
             const ownerResponse: NftOwnerResponse = {
                 owners: nftOwners,
                 total: nftOwners.length,
-                contractAddress,
-                networkId
+                contractAddress: cleanContractAddress,
+                networkId: cleanNetworkId
             };
 
             return {
@@ -391,21 +406,23 @@ ${networkId}`);
     async getNftsForOwner(ownerAddress: string, networkId: string,
         contractAddress?: string): Promise<ApiResponse<any>> {
         try {
-            const alchemyNetwork = ALCHEMY_NETWORKS[networkId];
+            // Trim inputs to remove any whitespace
+            const cleanOwnerAddress = ownerAddress.trim();
+            const cleanNetworkId = networkId.trim().toLowerCase();
+            const cleanContractAddress = contractAddress?.trim();
+
+            const alchemyNetwork = ALCHEMY_NETWORKS[cleanNetworkId];
             if (!alchemyNetwork) {
-                throw new Error(`Alchemy not supported for network: 
-${networkId}`);
+                throw new Error(`Alchemy not supported for network: ${cleanNetworkId}`);
             }
 
             const restUrl =
-                `https://${alchemyNetwork}.g.alchemy.com/nft/v3/${this.apiKey}/getNFTsFor
- Owner`;
+                `https://${alchemyNetwork}.g.alchemy.com/nft/v3/${this.apiKey}/getNFTsForOwner`;
             const params: Record<string, string | string[]> = {
-                owner:
-                    ownerAddress
+                owner: cleanOwnerAddress
             };
-            if (contractAddress) {
-                (params as any)['contractAddresses[]'] = contractAddress;
+            if (cleanContractAddress) {
+                (params as any)['contractAddresses[]'] = cleanContractAddress;
             }
 
             const response = await axios.get(restUrl, { params });
@@ -434,7 +451,10 @@ ${networkId}`);
     async getTokenMetadata(assetId: string):
         Promise<ApiResponse<TokenMetadataResponse>> {
         try {
-            const assetInfo = parseAssetId(assetId);
+            // Trim input to remove any whitespace
+            const cleanAssetId = assetId.trim();
+
+            const assetInfo = parseAssetId(cleanAssetId);
 
             if (assetInfo.type === 'native') {
                 const network = NETWORKS[assetInfo.networkId];
@@ -446,7 +466,7 @@ ${networkId}`);
                     name: network.nativeCurrency.name,
                     symbol: network.nativeCurrency.symbol,
                     decimals: network.nativeCurrency.decimals,
-                    assetId,
+                    assetId: cleanAssetId,
                     networkId: assetInfo.networkId,
                     type: 'native'
                 };
@@ -483,7 +503,7 @@ ${networkId}`);
                     decimals: Number(decimals),
                     totalSupply: totalSupply.toString(),
                     contractAddress: assetInfo.contractAddress,
-                    assetId,
+                    assetId: cleanAssetId,
                     networkId: assetInfo.networkId,
                     type: 'erc20'
                 };
@@ -515,7 +535,10 @@ ${networkId}`);
     async getNftMetadata(assetId: string):
         Promise<ApiResponse<NftMetadataResponse>> {
         try {
-            const assetInfo = parseAssetId(assetId);
+            // Trim input to remove any whitespace
+            const cleanAssetId = assetId.trim();
+
+            const assetInfo = parseAssetId(cleanAssetId);
 
             if (assetInfo.type !== 'erc721' && assetInfo.type !== 'erc1155') {
                 throw new Error(`Invalid NFT asset type: ${assetInfo.type}`);
@@ -580,10 +603,13 @@ ${networkId}`);
     async getNftCollectionMetadata(contractAddress: string, networkId:
         string): Promise<ApiResponse<any>> {
         try {
-            const alchemyNetwork = ALCHEMY_NETWORKS[networkId];
+            // Trim inputs to remove any whitespace
+            const cleanContractAddress = contractAddress.trim();
+            const cleanNetworkId = networkId.trim().toLowerCase();
+
+            const alchemyNetwork = ALCHEMY_NETWORKS[cleanNetworkId];
             if (!alchemyNetwork) {
-                throw new Error(`Alchemy not supported for network: 
-${networkId}`);
+                throw new Error(`Alchemy not supported for network: ${cleanNetworkId}`);
             }
 
             const alchemyUrl =
@@ -592,7 +618,7 @@ ${networkId}`);
             const response = await axios.post(alchemyUrl, {
                 jsonrpc: '2.0',
                 method: 'alchemy_getContractMetadata',
-                params: [contractAddress],
+                params: [cleanContractAddress],
                 id: 1
             });
 
@@ -604,8 +630,8 @@ ${networkId}`);
                     name: collectionData.name,
                     symbol: collectionData.symbol,
                     totalSupply: collectionData.totalSupply,
-                    contractAddress,
-                    networkId,
+                    contractAddress: cleanContractAddress,
+                    networkId: cleanNetworkId,
                     tokenType: collectionData.tokenType
                 },
                 timestamp: Date.now()

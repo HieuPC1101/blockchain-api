@@ -17,17 +17,20 @@ import { AssetInfo } from './networks';
  * - bitcoin (for Bitcoin) 
  */
 export function parseAssetId(assetId: string): AssetInfo {
+    // Trim whitespace and convert to lowercase for consistency
+    const cleanAssetId = assetId.trim().toLowerCase();
+
     // Check if it's CAIP format 
-    if (assetId.includes('/')) {
-        return parseCAIPAssetId(assetId);
+    if (cleanAssetId.includes('/')) {
+        return parseCAIPAssetId(cleanAssetId);
     }
 
     // Legacy format parsing 
-    const parts = assetId.split(':');
+    const parts = cleanAssetId.split(':');
 
-    if (assetId === 'bitcoin') {
+    if (cleanAssetId === 'bitcoin') {
         return {
-            assetId,
+            assetId: cleanAssetId,
             networkId: 'bitcoin',
             type: 'bitcoin'
         };
@@ -36,7 +39,7 @@ export function parseAssetId(assetId: string): AssetInfo {
     if (parts.length === 1) {
         // Native coin: ethereum, polygon, etc. 
         return {
-            assetId,
+            assetId: cleanAssetId,
             networkId: parts[0],
             type: 'native'
         };
@@ -45,7 +48,7 @@ export function parseAssetId(assetId: string): AssetInfo {
     if (parts.length === 2) {
         // ERC20 token: ethereum:0x... 
         return {
-            assetId,
+            assetId: cleanAssetId,
             networkId: parts[0],
             contractAddress: parts[1],
             type: 'erc20'
@@ -55,7 +58,7 @@ export function parseAssetId(assetId: string): AssetInfo {
     if (parts.length === 3) {
         // NFT: ethereum:0x...:123 
         return {
-            assetId,
+            assetId: cleanAssetId,
             networkId: parts[0],
             contractAddress: parts[1],
             tokenId: parts[2],
@@ -63,7 +66,7 @@ export function parseAssetId(assetId: string): AssetInfo {
         };
     }
 
-    throw new Error(`Invalid assetId format: ${assetId}`);
+    throw new Error(`Invalid assetId format: ${cleanAssetId}`);
 }
 
 /** 
