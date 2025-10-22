@@ -416,14 +416,16 @@ export class AlchemyProvider {
                 throw new Error(`Alchemy not supported for network: ${cleanNetworkId}`);
             }
 
-            const restUrl =
-                `https://${alchemyNetwork}.g.alchemy.com/nft/v3/${this.apiKey}/getNFTsForOwner`;
+            const restUrl = `https://${alchemyNetwork}.g.alchemy.com/nft/v3/${this.apiKey}/getNFTsForOwner`;
             const params: Record<string, string | string[]> = {
                 owner: cleanOwnerAddress
             };
             if (cleanContractAddress) {
                 (params as any)['contractAddresses[]'] = cleanContractAddress;
             }
+
+            console.log('Calling Alchemy NFT API:', restUrl);
+            console.log('Params:', params);
 
             const response = await axios.get(restUrl, { params });
 
