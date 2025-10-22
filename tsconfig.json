@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "target": "es2020",
+        "sourceMap": true,
+        "outDir": "dist",
+        "rootDir": ".",
+        "strict": true,
+        "resolveJsonModule": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "declaration": true,
+        "declarationMap": true
+    },
+    "include": [
+        "src/**/*",
+        "server.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "test-api.js"
+    ],
+    "lib": [
+        "es2020"
+    ]
+}
